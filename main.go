@@ -91,8 +91,24 @@ func main() {
 
 	// 取得したメッセージを表示する処理
 	for _, msg := range messages {
-		fmt.Printf("[%s] %s: %s\n", msg.Ts, msg.User, msg.Text) // メッセージのタイムスタンプ、ユーザー名、本文を表示
+		// ユーザー名を取得
+		userName, err := getUserName(msg.User)
+		if err != nil {
+			fmt.Printf("Error getting username for user %s: %v\n", msg.User, err)
+			continue
+		}
+
+		// タイムスタンプを日時に変換
+		timestamp, err := formatTimestamp(msg.Ts)
+		if err != nil {
+			fmt.Printf("Error formatting timestamp %s: %v\n", msg.Ts, err)
+			continue
+		}
+
+		// メッセージの表示
+		fmt.Printf("[%s] %s: %s\n", timestamp, userName, msg.Text)
 	}
+
 }
 
 // getUserName Slack API を使用してユーザー名を取得する関数
