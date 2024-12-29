@@ -93,6 +93,50 @@ func main() {
 	}
 }
 
+// getUserName Slack API を使用してユーザー名を取得する関数
+func getUserName(userID string) (string, error) {
+	apiURL := "https://slack.com/api/users.info"
+	client := &http.Client{}
+	data := url.Values{}
+	data.Set("user", userID)
+
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+slackBotToken)
+	req.URL.RawQuery = data.Encode()
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to call slack api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("slack api request failed with status: %s", resp.Status)
+	}
+
+	var response struct {
+		OK   bool `json:"ok"`
+		User struct {
+			Profile struct {
+				RealName string `json:"real_name"`
+			} `json:"profile"`
+		} `json:"user"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return "", fmt.Errorf("failed to decode slack api response: %w", err)
+	}
+
+	if !response.OK {
+		return "", fmt.Errorf("slack api returned an error")
+	}
+
+	return response.User.Profile.RealName, nil
+}
+
 // extractSlackLinkInfo Slack のメッセージ URL からチャンネル ID とタイムスタンプを抽出する関数
 func extractSlackLinkInfo(link string) (string, string) {
 	re := regexp.MustCompile(`https:\/\/([a-zA-Z0-9-]+)\.slack\.com\/archives\/(C[A-Za-z0-9]+)\/p([0-9]{10})([0-9]{6})`) // 正規表現パターン
