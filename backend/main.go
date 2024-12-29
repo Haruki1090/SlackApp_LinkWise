@@ -14,31 +14,25 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/rs/cors"
 )
 
 // SlackMessageResponse Slack APIの conversations.replies メソッドのレスポンスを格納する構造体
 type SlackMessageResponse struct {
-	OK               bool           `json:"ok"`       // API リクエストが成功したかどうか
-	Messages         []SlackMessage `json:"messages"` // メッセージのリスト
-	HasMore          bool           `json:"has_more"` // まだ取得できるメッセージがあるかどうか
+	OK               bool           `json:"ok"`
+	Messages         []SlackMessage `json:"messages"`
+	HasMore          bool           `json:"has_more"`
 	ResponseMetadata struct {
-		NextCursor string `json:"next_cursor"` // 次のページのカーソル
-	} `json:"response_metadata"` // ページネーション情報
-	Error string `json:"error"` // エラー情報を追加
+		NextCursor string `json:"next_cursor"`
+	} `json:"response_metadata"`
+	Error string `json:"error"`
 }
 
 // SlackMessage 個々のメッセージの情報を格納する構造体
 type SlackMessage struct {
-	ClientMsgID  string        `json:"client_msg_id"`  // クライアントが生成したメッセージ ID
-	Type         string        `json:"type"`           // メッセージの種類
-	Subtype      string        `json:"subtype"`        // メッセージのサブタイプ
-	Text         string        `json:"text"`           // メッセージの本文
-	User         string        `json:"user"`           // メッセージを投稿したユーザーの ID
-	Ts           string        `json:"ts"`             // メッセージのタイムスタンプ
-	ThreadTs     *string       `json:"thread_ts"`      // スレッドの親メッセージのタイムスタンプ。スレッドにない場合は nil
-	ParentUserID *string       `json:"parent_user_id"` // 親メッセージを投稿したユーザーの ID。親メッセージがない場合は nil
-	Team         string        `json:"team"`           // メッセージを投稿したチームの ID
-	Blocks       []interface{} `json:"blocks"`         // メッセージのブロック
+	Text string `json:"text"`
+	User string `json:"user"`
+	Ts   string `json:"ts"`
 }
 
 // RequestPayload フロントエンドから受け取るリクエストの構造体
@@ -48,11 +42,8 @@ type RequestPayload struct {
 
 // ResponsePayload フロントエンドに返すレスポンスの構造体
 type ResponsePayload struct {
-	Timestamp string         `json:"timestamp"`
-	UserName  string         `json:"user_name"`
-	Text      string         `json:"text"`
-	Error     string         `json:"error,omitempty"`
-	Messages  []ResponseData `json:"messages,omitempty"`
+	Messages []ResponseData `json:"messages"`
+	Error    string         `json:"error,omitempty"`
 }
 
 // ResponseData 個々のメッセージをフロントエンドに返すための構造体
@@ -71,7 +62,7 @@ func main() {
 		log.Println("Warning: .env file not found")
 	}
 
-	slackBotToken = os.Getenv("SLACK_BOT_TOKEN") // 環境変数から Slack Bot のトークンを取得
+	slackBotToken = os.Getenv("SLACK_BOT_TOKEN")
 	if slackBotToken == "" {
 		log.Fatal("Error: SLACK_BOT_TOKEN environment variable is not set")
 	}
@@ -79,14 +70,23 @@ func main() {
 	// Render の環境変数 PORT を取得
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // ローカル環境のデフォルトポート
+		port = "8080"
 	}
 
 	// HTTPハンドラーの設定
-	http.HandleFunc("/api/fetch-message", handleFetchMessage)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/fetch-message", handleFetchMessage)
+
+	// CORS設定
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"}, // 必要に応じてフロントエンドのURLを指定
+		AllowedMethods:   []string{"GET", "POST"},
+		AllowedHeaders:   []string{"Content-Type"},
+		AllowCredentials: true,
+	}).Handler(mux)
 
 	fmt.Printf("Go backend running on http://localhost:%s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(http.ListenAndServe(":"+port, corsHandler))
 }
 
 // handleFetchMessage フロントエンドからのリクエストを処理するハンドラー
@@ -132,13 +132,11 @@ func handleFetchMessage(w http.ResponseWriter, r *http.Request) {
 	// レスポンス用にメッセージを整形
 	var responseMessages []ResponseData
 	for _, msg := range messages {
-		// ユーザー名を取得
 		userName, err := getUserName(msg.User)
 		if err != nil {
 			userName = "Unknown"
 		}
 
-		// タイムスタンプを日時に変換
 		formattedTimestamp, err := formatTimestamp(msg.Ts)
 		if err != nil {
 			formattedTimestamp = msg.Ts
@@ -158,15 +156,8 @@ func handleFetchMessage(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// userCache ユーザー名のキャッシュを保持するマップ
-var userCache = make(map[string]string)
-
 // getUserName Slack API を使用してユーザー名を取得する関数
 func getUserName(userID string) (string, error) {
-	// キャッシュを確認
-	if name, exists := userCache[userID]; exists {
-		return name, nil
-	}
 	apiURL := "https://slack.com/api/users.info"
 	client := &http.Client{}
 	data := url.Values{}
@@ -212,7 +203,6 @@ func getUserName(userID string) (string, error) {
 
 // formatTimestamp タイムスタンプを日時にフォーマットする関数
 func formatTimestamp(ts string) (string, error) {
-	// タイムスタンプは "1234567890.123456" の形式
 	parts := regexp.MustCompile(`\.`).Split(ts, 2)
 	if len(parts) < 1 {
 		return "", fmt.Errorf("invalid timestamp format")
@@ -223,7 +213,6 @@ func formatTimestamp(ts string) (string, error) {
 		return "", fmt.Errorf("failed to parse timestamp: %w", err)
 	}
 
-	// Unixタイムスタンプを日時に変換
 	t := time.Unix(seconds, 0)
 	return t.Format("2006-01-02 15:04:05"), nil
 }
@@ -232,7 +221,6 @@ func formatTimestamp(ts string) (string, error) {
 func extractSlackLinkInfo(link string) (string, string) {
 	re := regexp.MustCompile(`https:\/\/([a-zA-Z0-9-]+)\.slack\.com\/archives\/([CG][A-Za-z0-9]+)\/p([0-9]{10})([0-9]{6})`)
 	match := re.FindStringSubmatch(link)
-	// マッチした部分が 5 つの場合はチャンネル ID とタイムスタンプを返す
 	if len(match) == 5 {
 		channelID := match[2]
 		timestamp := fmt.Sprintf("%s.%s", match[3], match[4])
@@ -255,7 +243,7 @@ func getThreadMessages(channelID, parentTimestamp string) ([]SlackMessage, error
 		data.Set("channel", channelID)
 		data.Set("ts", parentTimestamp)
 		data.Set("inclusive", "true")
-		data.Set("limit", "100") // 一度に取得するメッセージ数を設定
+		data.Set("limit", "100")
 
 		if cursor != "" {
 			data.Set("cursor", cursor)
@@ -289,7 +277,6 @@ func getThreadMessages(channelID, parentTimestamp string) ([]SlackMessage, error
 		}
 
 		allMessages = append(allMessages, slackResponse.Messages...)
-
 		cursor = slackResponse.ResponseMetadata.NextCursor
 		if cursor == "" {
 			break
