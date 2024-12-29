@@ -20,7 +20,8 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to fetch message");
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch message");
       }
 
       const data = await response.json();
