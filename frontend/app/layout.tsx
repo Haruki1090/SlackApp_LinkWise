@@ -1,5 +1,3 @@
-import './globals.css';
-
 export default function RootLayout({
   children,
 }: {
@@ -7,7 +5,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <head>
+        <title>Slack Message Fetcher</title>
+      </head>
+      <body className="bg-gradient-to-r from-blue-100 to-blue-300 min-h-screen flex items-center justify-center">
+        {children}
+      </body>
     </html>
   );
 }

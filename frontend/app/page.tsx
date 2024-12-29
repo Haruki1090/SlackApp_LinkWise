@@ -1,17 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
+
+interface SlackMessage {
+  text: string;
+  user: string;
+  ts: string;
+  user_name: string;
+  timestamp: string;
+}
 
 export default function Home() {
   const [url, setUrl] = useState("");
-  const [result, setResult] = useState("");
-  const [error, setError] = useState("");
+  const [messages, setMessages] = useState<SlackMessage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleFetch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setResult("");
-
+  const handleFetchMessages = async () => {
+    if (!url.trim()) {
+      setError("Please enter a valid Slack message URL.");
+      return;
+    }
+    setError(null); // Reset error state
+    setLoading(true);
     try {
       const response = await fetch("/api/fetch-message", {
         method: "POST",
@@ -20,48 +31,61 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to fetch message");
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
       const data = await response.json();
-      setResult(JSON.stringify(data, null, 2));
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message || "エラーが発生しました");
-      } else {
-        setError("エラーが発生しました");
-      }
+      setMessages(data.messages || []);
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+      setError("Failed to fetch messages. Please check the URL and try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center">
-      <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-          Slack Message Fetcher
-        </h1>
-        <form onSubmit={handleFetch} className="space-y-4">
-          <input
-            type="text"
-            placeholder="SlackのメッセージURLを入力"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-          <button
-            type="submit"
-            className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            取得
-          </button>
-        </form>
-        {error && <p className="text-red-500 text-center mt-4">{error}</p>}
-        {result && (
-          <pre className="bg-gray-100 p-4 mt-4 rounded-lg text-sm overflow-auto">
-            {result}
-          </pre>
-        )}
+    <div className="bg-white shadow-lg rounded-lg p-8 max-w-lg w-full">
+      <h1 className="text-2xl font-bold text-gray-800 text-center mb-6">
+        Slack Message Fetcher
+      </h1>
+      <div className="space-y-4">
+        <input
+          type="text"
+          placeholder="Enter Slack message URL"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
+        <button
+          onClick={handleFetchMessages}
+          disabled={loading}
+          className={`w-full ${
+            loading
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600"
+          } text-white py-2 px-4 rounded-lg transition duration-200`}
+        >
+          {loading ? "Fetching..." : "取得"}
+        </button>
+      </div>
+      {error && (
+        <p className="text-red-500 text-sm mt-2">{error}</p>
+      )}
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Messages</h2>
+        <div className="space-y-4 max-h-80 overflow-y-auto">
+          {messages.map((msg, index) => (
+            <div key={index} className="bg-gray-50 border p-4 rounded-lg">
+              <p className="text-sm text-gray-600">{msg.timestamp}</p>
+              <p className="font-bold text-gray-800">{msg.user_name}</p>
+              <p className="text-gray-700">{msg.text}</p>
+            </div>
+          ))}
+          {messages.length === 0 && !loading && (
+            <p className="text-gray-600">No messages found.</p>
+          )}
+        </div>
       </div>
     </div>
   );
