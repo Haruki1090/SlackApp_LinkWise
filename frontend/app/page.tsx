@@ -19,7 +19,7 @@ export default function Home() {
     if (!url) return alert("Please enter a valid Slack message URL.");
     setLoading(true);
     try {
-      const response = await fetch("/api/fetch-message", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/fetch-message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
