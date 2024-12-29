@@ -10,6 +10,8 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -135,6 +137,24 @@ func getUserName(userID string) (string, error) {
 	}
 
 	return response.User.Profile.RealName, nil
+}
+
+// formatTimestamp タイムスタンプを日時にフォーマットする関数
+func formatTimestamp(ts string) (string, error) {
+	// タイムスタンプは "1234567890.123456" の形式
+	parts := regexp.MustCompile(`\.`).Split(ts, 2)
+	if len(parts) < 1 {
+		return "", fmt.Errorf("invalid timestamp format")
+	}
+
+	seconds, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse timestamp: %w", err)
+	}
+
+	// Unixタイムスタンプを日時に変換
+	t := time.Unix(seconds, 0)
+	return t.Format("2006-01-02 15:04:05"), nil
 }
 
 // extractSlackLinkInfo Slack のメッセージ URL からチャンネル ID とタイムスタンプを抽出する関数
