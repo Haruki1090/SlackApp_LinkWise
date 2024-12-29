@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"sort"
+
+	"github.com/joho/godotenv"
 )
 
 // SlackMessageResponse Slack APIの conversations.history メソッドのレスポンスを格納する構造体
@@ -39,6 +42,12 @@ type SlackMessage struct {
 var slackBotToken string
 
 func main() {
+	// .env ファイルから環境変数を読み込む
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	// コマンドライン引数から Slack メッセージ URL を取得
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run main.go <slack_message_url>")
