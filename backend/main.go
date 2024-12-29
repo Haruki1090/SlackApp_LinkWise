@@ -68,7 +68,7 @@ func main() {
 	// .env ファイルから環境変数を読み込む
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Warning: .env file not found")
 	}
 
 	slackBotToken = os.Getenv("SLACK_BOT_TOKEN") // 環境変数から Slack Bot のトークンを取得
@@ -76,11 +76,17 @@ func main() {
 		log.Fatal("Error: SLACK_BOT_TOKEN environment variable is not set")
 	}
 
+	// Render の環境変数 PORT を取得
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // ローカル環境のデフォルトポート
+	}
+
 	// HTTPハンドラーの設定
 	http.HandleFunc("/api/fetch-message", handleFetchMessage)
 
-	fmt.Println("Go backend running on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	fmt.Printf("Go backend running on http://localhost:%s\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 // handleFetchMessage フロントエンドからのリクエストを処理するハンドラー
